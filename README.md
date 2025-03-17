@@ -1,4 +1,4 @@
-# HelloPlugin
+# KCD Dice Game
 
 <!--
 ## 插件开发者详阅
