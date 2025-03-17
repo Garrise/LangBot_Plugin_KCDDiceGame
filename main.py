@@ -71,7 +71,9 @@ class KCDDiceGamePlugin(BasePlugin):
                     return 0
         elif dices[1] >= 1: #存在2
             score = 0
-            if dices[1] >= 3:
+            if dices[1] <= 2:
+                return 0
+            else:
                 score += 200 * (2 ** (dices[1]-3))
             dices[1] = 0
             if dices == [0, 0, 0, 0, 0, 0]:
@@ -84,7 +86,9 @@ class KCDDiceGamePlugin(BasePlugin):
                     return 0
         elif dices[2] >= 1: #存在3
             score = 0
-            if dices[2] >= 3:
+            if dices[2] <= 2:
+                return 0
+            else:
                 score += 300 * (2 ** (dices[2]-3))
             dices[2] = 0
             if dices == [0, 0, 0, 0, 0, 0]:
@@ -97,7 +101,9 @@ class KCDDiceGamePlugin(BasePlugin):
                     return 0
         elif dices[3] >= 1: #存在4
             score = 0
-            if dices[3] >= 3:
+            if dices[3] <= 2:
+                return 0
+            else:
                 score += 400 * (2 ** (dices[3]-3))
             dices[3] = 0
             if dices == [0, 0, 0, 0, 0, 0]:
@@ -125,7 +131,9 @@ class KCDDiceGamePlugin(BasePlugin):
                     return 0
         elif dices[5] >= 1: #存在6
             score = 0
-            if dices[5] >= 3:
+            if dices[5] <= 2:
+                return 0
+            else:
                 score += 600 * (2 ** (dices[5]-3))
             dices[5] = 0
             if dices == [0, 0, 0, 0, 0, 0]:
@@ -141,6 +149,7 @@ class KCDDiceGamePlugin(BasePlugin):
         dices = [0, 0, 0, 0, 0, 0]
         for i in range(1, 6):
             for dice_combines in itertools.combinations(dice_lake, i):
+                dices = [0, 0, 0, 0, 0, 0]
                 for item in dice_combines:
                     dices[item - 1] += 1
                 if self.score_calculate(dices) != 0:
