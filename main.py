@@ -59,10 +59,11 @@ class KCDDiceGamePlugin(BasePlugin):
     
     def score_calculate(self, dices):
         #首先判断金制君主徽章
-        if dices[0] >= 3 and dices[0] < 6 and self.player_badges[str(self.player[self.turn])] == 3 and self.mode == 1:
-            dices[0] -= 3
-            self.archlord = True
-            return 3000 + self.score_calculate(dices)
+        if self.mode == 1:
+            if dices[0] >= 3 and dices[0] < 6 and self.player_badges[str(self.player[self.turn])] == 3:
+                dices[0] -= 3
+                self.archlord = True
+                return 3000 + self.score_calculate(dices)
         if all(x == 1 for x in dices): #存在1,2,3,4,5,6
             return 1500
         if all(x >= 1 for x in dices[:5]): #存在1,2,3,4,5
@@ -128,7 +129,7 @@ class KCDDiceGamePlugin(BasePlugin):
         str += f"\n本回合积分：{self.temp_score} 总积分：{self.score[self.turn]}"
         return str
     def roll_dice(self, dice_ids="", reroll=False):
-        if reroll and re.match(fr"^(?!.*(.).*\1)[1-6]{{1,{self.dice_num}}}$", dice_ids):
+        if reroll and re.match(fr"^(?!.*(.).*\1)[1-{self.dice_num}]{{1,{self.dice_num}}}$", dice_ids):
             for dice_id in dice_ids:
                 self.dice_lake[int(dice_id) - 1] = random.randint(1, 6)
         else:
@@ -166,6 +167,18 @@ class KCDDiceGamePlugin(BasePlugin):
     async def group_message_received(self, ctx: EventContext):
         msg = str(ctx.event.message_chain).strip()  # 这里的 event 即为 GroupNormalMessageReceived 的对象
         sender_id = ctx.event.sender_id
+        if msg == "kcd help":
+            self.init_game()
+            await ctx.send_message(ctx.event.launcher_type, str(ctx.event.launcher_id),MessageChain([r"项目地址：https://github.com/Garrise/LangBot_Plugin_KCDDiceGame" + "\n指令列表：\n" +
+                                                                                                    "kcd help - 查看指令列表\n" +
+                                                                                                    "kcd start [score] / 玩骰子 [分数] - 开始或加入一局骰子游戏，可以自定义目标积分\n" +
+                                                                                                    "kcd start badge [score] / 玩徽章骰子 [分数] - 开始一局徽章骰子游戏，可以自定义目标积分\n" +
+                                                                                                    "kcd badge / 设定徽章 - 查看当前装备的徽章以及徽章列表\n" +
+                                                                                                    "kcd badge [id] / 设定徽章 [序号] - 设定当前装备的徽章\n" +
+                                                                                                    "kcd check / 查分 - 查询当前得分\n" +
+                                                                                                    "kcd score table / - 查询计分表\n" +
+                                                                                                    "kcd reset / 重置骰子游戏 - 重置骰子游戏"]))
+            ctx.prevent_default()
         if msg == "重置骰子游戏" or msg =="kcd reset":
             self.init_game()
             await ctx.send_message(ctx.event.launcher_type, str(ctx.event.launcher_id),MessageChain(["骰子游戏已重置。"]))
@@ -252,6 +265,15 @@ class KCDDiceGamePlugin(BasePlugin):
                 await ctx.send_message(ctx.event.launcher_type, str(ctx.event.launcher_id),MessageChain([f"{sender_id} 装备了{self.badge_list[badge_id - 1][0]}"]))
                 ctx.prevent_default()
 
+        if re.match(fr"^kcd set [1-6]{{1,{self.dice_num}}}", msg):
+            dices = msg[8:]
+            for index, item in enumerate(dices):
+                self.dice_lake[index] = int(item)
+            reply = [self.build_dice_str()]
+            reply.append("\n请输入你希望选择的骰子编号，如果你希望继续投骰，请以\"?\"结尾；如果你希望跳过这回合，请以\"!\"结尾。\n例如，如果你希望选择1，2，3号骰子并跳过，则需要输入\"123!\"\n输入\"计分表\"或\"kcd score table\"以查阅计分表。")
+            await ctx.send_message(ctx.event.launcher_type, str(ctx.event.launcher_id),MessageChain(reply))
+            ctx.prevent_default()
+            
         if (msg == "使用徽章" or msg == "kcd use badge") and self.status == True and self.mode == 1:
             #检查是否轮到使用者
             if sender_id == self.player[self.turn]:
@@ -397,7 +419,7 @@ class KCDDiceGamePlugin(BasePlugin):
 分数翻一倍｜２２２２２２｜１６００"""]))
             ctx.prevent_default()
 
-        if re.match(fr"^(?!.*(.).*\1)[1-6]{{1,{self.dice_num}}}[!?]$", msg) and self.status == True: #每回合后续算分并投骰
+        if re.match(fr"^(?!.*(.).*\1)[1-{self.dice_num}]{{1,{self.dice_num}}}[!?]$", msg) and self.status == True: #每回合后续算分并投骰
             if self.player[self.turn] == sender_id:
                 dice_ids = []
                 next = False
@@ -414,9 +436,12 @@ class KCDDiceGamePlugin(BasePlugin):
                     ctx.prevent_default()
                 else: #算分有效，计入本回合积分，去除使用过的骰子，并判断是否继续投骰
                     #金制镜像徽章
-                    if self.player_badges[str(sender_id)] == 5 and self.mode == 1 and self.wait == 5:
-                        self.temp_score += 2 * score
-                        self.wait = -1
+                    if self.mode == 1:
+                        if self.player_badges[str(sender_id)] == 5 and self.wait == 5:
+                            self.temp_score += 2 * score
+                            self.wait = -1
+                        else:
+                            self.temp_score += score
                     else:
                         self.temp_score += score
                     self.dice_num -= len(dice_str)
@@ -433,9 +458,14 @@ class KCDDiceGamePlugin(BasePlugin):
                             reply.append("\n请输入你希望选择的骰子编号，如果你希望继续投骰，请以\"?\"结尾；如果你希望跳过这回合，请以\"!\"结尾。\n例如，如果你希望选择1，2，3号骰子并跳过，则需要输入\"123!\"")
                         else:
                             #检查重投或换点类徽章
-                            if self.mode == 1 and self.badge_counts[self.turn] > 0 and self.player_badges[str(sender_id)] == 0 or self.player_badges[str(sender_id)] == 1 or self.player_badges[str(sender_id)] == 6:
-                                reply.append(f"\n无法得分，你可以使用{self.badge_list[self.player_badges[str(sender_id)]][0]}！不使用请输入\"!\"跳过")
-                                self.wait = -2
+                            if self.mode == 1:
+                                if self.badge_counts[self.turn] > 0 and self.player_badges[str(sender_id)] == 0 or self.player_badges[str(sender_id)] == 1 or self.player_badges[str(sender_id)] == 6:
+                                    reply.append(f"\n无法得分，你可以使用{self.badge_list[self.player_badges[str(sender_id)]][0]}！不使用请输入\"!\"跳过")
+                                    self.wait = -2
+                                else:
+                                    reply.append("\n无法得分，本回合投骰作废！")
+                                    self.turn_change()
+                                    reply.append(self.roll_str())
                             else:
                                 reply.append("\n无法得分，本回合投骰作废！")
                                 self.turn_change()
@@ -445,14 +475,18 @@ class KCDDiceGamePlugin(BasePlugin):
                     else: #跳过投骰，将本回合积分加入总分，切换回合
                         #金制军阀徽章
                         reply = []
-                        if self.player_badges[str(sender_id)] == 7 and self.mode == 1 and self.wait == 7:
-                            self.score[self.turn] += 2 * self.temp_score
-                            reply.append(f"{self.player[self.turn]} 的回合得分为{2 * self.temp_score}分。")
-                            self.wait = -1
+                        if self.mode == 1:
+                            if self.player_badges[str(sender_id)] == 7 and self.wait == 7:
+                                self.score[self.turn] += 2 * self.temp_score
+                                reply.append(f"{self.player[self.turn]} 的回合得分为{2 * self.temp_score}分。")
+                                self.wait = -1
+                            else:
+                                self.score[self.turn] += self.temp_score
+                                reply.append(f"{self.player[self.turn]} 的回合得分为{self.temp_score}分。")
                         else:
                             self.score[self.turn] += self.temp_score
                             reply.append(f"{self.player[self.turn]} 的回合得分为{self.temp_score}分。")
-                        reply.append("目前总分为{self.score[self.turn]}。")
+                        reply.append(f"目前总分为{self.score[self.turn]}。")
                         if self.score[self.turn] >= self.target_score:
                             reply.append(f"{self.player[self.turn]} 赢得了胜利！")
                             self.init_game()
